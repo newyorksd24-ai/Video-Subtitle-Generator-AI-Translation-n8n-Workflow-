@@ -1,153 +1,106 @@
-# 🎬 Video Subtitle Generator – AI Translation (n8n Workflow)
+# 🎬 AI Video Subtitle Generator – n8n Workflow
 
-A simple but powerful **n8n workflow** that automatically generates **English SRT subtitles** starting from an Italian video, using **Whisper for transcription** and **GPT for translation and technical refinement**.
+## Overview
+This project is an **n8n automation workflow** that automatically generates subtitles from videos and translates them into multiple languages using AI.
 
-Designed for technical demos, software tutorials, and automation showcases.
+The workflow combines **Google Drive**, **OpenAI Whisper**, and **GPT models** to create a fully automated subtitle pipeline.
 
----
-
-## 🚀 What It Does
-
-1. Downloads a video from **Google Drive**
-2. Extracts audio and sends it to **Whisper API**
-3. Receives a detailed transcription with timestamps
-4. Sends transcript segments to **GPT** for:
-   - Italian → English translation  
-   - Grammar and clarity correction  
-   - Technical terminology refinement  
-5. Converts segments into an **.SRT subtitle file**
-6. Outputs a ready-to-use subtitle file
+**Goal:**  
+From a single video file → **Transcription → Translation → `.srt` Subtitle File**
 
 ---
 
-## 🧩 Workflow Structure
-
-
----
-
-## 🔧 Nodes Overview
-
-### 1. Manual Trigger
-Starts the workflow manually.
-
-### 2. Google Drive – Download File
-- Resource: File  
-- Operation: Download  
-- Binary Field: `data`
-
-### 3. HTTP Request – Whisper API
-- Method: POST  
-- Endpoint: `/v1/audio/transcriptions`  
-- Model: `whisper-1`  
-- Language: `it`  
-- Response Format: `verbose_json`  
-- File: Binary data from previous node  
-
-### 4. OpenAI – GPT Translate & Refine
-- Model: `gpt-4o-mini`  
-- Input: Whisper JSON segments  
-- Responsibilities:
-  - Natural translation
-  - Technical term correction
-  - Preserve timestamps
-  - Keep exact JSON structure
-
-### 5. Code Node – Generate SRT
-- Language: JavaScript  
-- Converts seconds → SRT time format  
-- Generates `subtitles.srt`  
-- Outputs a binary file ready for download or reuse
+## Core Features
+- Automatic audio transcription (Whisper)
+- AI-powered translation (GPT)
+- Multi-language subtitle generation
+- `.srt` file creation with accurate timestamps
+- Google Drive integration
+- Fully automated n8n workflow
+- Scalable and modular structure
 
 ---
 
-## 📁 Output
+## Workflow Structure
 
-- **Format:** `.srt`  
-- **Content:** Time-synchronized English subtitles  
-- **Usage:** YouTube, Vimeo, video players, technical demos
+### 1. Trigger
+Manual or Webhook trigger to start the workflow.
+
+### 2. Google Drive – Download Video
+Downloads the video file and stores it as binary data.
+
+### 3. Set Language Parameters
+Defines:
+- `targetLang` → Subtitle output language
+- `sourceLang` → Auto-detect or manual
+- `targetName` → Language name (English, Spanish, German…)
+
+### 4. Whisper – Audio Transcription
+- Converts speech to text
+- Auto-detects spoken language
+- Outputs **segments + timestamps**
+
+### 5. Merge Node
+Combines:
+- Language parameters
+- Whisper transcript segments
+
+### 6. GPT – Translate & Refine
+- Translates each segment into the target language
+- Preserves timestamps
+- Ensures natural phrasing
+
+### 7. Code – Generate SRT File
+- Formats subtitles into `.srt`
+- Keeps timing precision
+- Outputs downloadable file
 
 ---
 
-## 🛠 Requirements
+## Supported Languages (Example)
+- English (EN)
+- Spanish (ES)
+- German (DE)
+- Italian (IT)
 
+Additional languages can be added easily.
+
+---
+
+## Requirements
 - n8n (Cloud or Self-Hosted)
-- Google Drive account
 - OpenAI API Key
-- HTTP Bearer credentials
+- Google Drive Access
+- Code Node enabled
 
 ---
 
-## 🔐 Required Credentials
-
-| Service | Type |
-|--------|------|
-| Google Drive | OAuth2 |
-| OpenAI | API Key |
-| HTTP Request | Bearer Auth |
-
----
-
-## 🎯 Use Cases
-
-- Automation demos  
-- Technical tutorials  
-- Educational videos  
-- Product presentations  
-- Developer / Automation Engineer portfolios  
+## Possible Extensions
+- Direct YouTube upload
+- Batch video processing
+- Webhook API interface
+- Cloud storage export (S3 / Drive)
+- User-selected target language
+- Automatic language detection logic
 
 ---
 
-## 💡 Strengths
-
-- Fully automated pipeline  
-- Professional-quality subtitles  
-- Correct technical terminology  
-- Ready-to-use output  
-- Modular and reusable design  
-
----
-
-## 🔄 Possible Extensions
-
-- Automatic multi-language support  
-- Direct YouTube upload  
-- Google Drive / S3 storage  
-- Webhook interface  
-- Batch video processing  
+## Use Cases
+- YouTube content
+- Online courses
+- Product demos
+- Marketing videos
+- Training materials
+- Multilingual documentation
 
 ---
 
-## 📦 Workflow File
-
-Import directly into n8n:
-
-`Video Subtitle Generator - AI Translation.json`
+## Project Goal
+A **scalable AI-powered subtitle generator** that eliminates manual editing and integrates easily into larger automation systems.
 
 ---
 
-## 🧠 Technical Notes
-
-- Whisper returns timestamped segments (`start`, `end`)
-- GPT keeps the JSON structure unchanged
-- The Code Node handles:
-  - JSON parsing
-  - Markdown cleanup
-  - Time formatting
-  - Binary SRT file creation
-
----
-
-## 👤 Author Purpose
-
-This workflow demonstrates skills in:
-
-- Automation Engineering  
-- API Integration  
-- AI Workflow Design  
-- Data Transformation  
-
----
-
-## License
-
-Free to use for educational and demonstration purposes.
+## Author
+**Fabio Roggero**  
+Languages: Italian • English • Spanish • German  
+Focus: Workflow Automation • AI Integration • n8n
