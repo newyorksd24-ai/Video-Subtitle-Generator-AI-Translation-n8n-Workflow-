@@ -1,0 +1,274 @@
+{
+  "name": "Video Subtitle Generator - AI Translation",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        48
+      ],
+      "id": "5e183796-97e7-4653-b5c0-73827e420b47",
+      "name": "START"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/audio/transcriptions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "whisper-1"
+            },
+            {
+              "name": "response_format",
+              "value": "verbose_json"
+            },
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        448,
+        144
+      ],
+      "id": "04c3b104-2c5f-429f-9dd7-3bb8a5757454",
+      "name": "Whisper - Transcribe Audio (IT)",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "Drw04dkmsak2YC3R",
+          "name": "Bearer Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "1Qc-BYlMPNIgGZBnw5t9IBivWpdbzFXdC",
+          "mode": "list",
+          "cachedResultName": "W4.mp4",
+          "cachedResultUrl": "https://drive.google.com/file/d/1Qc-BYlMPNIgGZBnw5t9IBivWpdbzFXdC/view?usp=drivesdk"
+        },
+        "options": {
+          "binaryPropertyName": "data"
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        224,
+        48
+      ],
+      "id": "2f919b43-0dcd-48d8-8fa8-03d4e72c7697",
+      "name": "Download video from Drive",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "cl6It0afYIWQfKcT",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// @ts-nocheck\n\nfunction toSrtTime(seconds) {\n  const ms = Math.round(Number(seconds) * 1000);\n  const hh = String(Math.floor(ms / 3600000)).padStart(2, '0');\n  const mm = String(Math.floor((ms % 3600000) / 60000)).padStart(2, '0');\n  const ss = String(Math.floor((ms % 60000) / 1000)).padStart(2, '0');\n  const mmm = String(ms % 1000).padStart(3, '0');\n  return `${hh}:${mm}:${ss},${mmm}`;\n}\n\n// 1) Prendi testo del GPT (varianti possibili)\nconst raw =\n  $json.output?.[0]?.content?.[0]?.text ??\n  $json.output?.[0]?.content?.[0]?.output_text ??\n  $json.content?.[0]?.text ??\n  $json.text;\n\nif (!raw) {\n  throw new Error(\n    \"Missing GPT output text. Expected one of: \" +\n    \"output[0].content[0].text | output[0].content[0].output_text | content[0].text | text\"\n  );\n}\n\n// 2) Se GPT ha “sporcato” l’output, estrai solo il blocco JSON tra { ... }\nconst rawStr = String(raw);\nconst firstBrace = rawStr.indexOf('{');\nconst lastBrace = rawStr.lastIndexOf('}');\nif (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {\n  throw new Error(\"GPT output does not contain a JSON object. First 300 chars: \" + rawStr.slice(0, 300));\n}\nconst jsonOnly = rawStr.slice(firstBrace, lastBrace + 1);\n\n// 3) Parse JSON\nlet parsed;\ntry {\n  parsed = JSON.parse(jsonOnly);\n} catch (e) {\n  throw new Error(\"GPT output JSON parse failed. First 300 chars: \" + jsonOnly.slice(0, 300));\n}\n\n// 4) Segments: accetta solo parsed.segments array\nconst segments = parsed?.segments;\nif (!Array.isArray(segments)) {\n  throw new Error(\n    \"parsed.segments is not an array. Top keys: \" + Object.keys(parsed || {}).join(\", \")\n  );\n}\n\n// 5) Costruisci SRT\nlet srt = \"\";\nsegments.forEach((seg, i) => {\n  srt += `${i + 1}\\n`;\n  srt += `${toSrtTime(seg.start)} --> ${toSrtTime(seg.end)}\\n`;\n  srt += `${String(seg.text || \"\").trim()}\\n\\n`;\n});\n\n// 6) Nome file (leggi targetLang dal Merge, non dal GPT output)\nconst lang = $node[\"Merge\"].json.targetLang || \"es\";\nconst filename = `subtitles_${lang}.srt`;\n\nreturn [{\n  json: { filename, srtContent: srt },\n  binary: {\n    data: await this.helpers.prepareBinaryData(\n      Buffer.from(srt, \"utf-8\"),\n      filename,\n      \"text/plain\"\n    )\n  }\n}];\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1248,
+        48
+      ],
+      "id": "e8739913-2dfa-49c1-9854-21150329f392",
+      "name": "Code: Generate SRT file"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "66698118-97cd-4647-9ec3-d47c3af90f8d",
+              "name": "targetLang",
+              "value": "={{$json.targetLang || \"es\"}}",
+              "type": "string"
+            },
+            {
+              "id": "1aa4b595-1014-4584-bf0e-84d97374483a",
+              "name": "sourceLang",
+              "value": "=\"en\"",
+              "type": "string"
+            },
+            {
+              "id": "a407ea7a-3a91-452e-9bf8-5e25f5aea350",
+              "name": "targetName",
+              "value": "={{({\n  en:\"English\",\n  es:\"Spanish\",\n  de:\"German\",\n  it:\"Italian\",\n  fr:\"French\"\n}[$json.targetLang || \"es\"]) || \"Spanish\"}}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        448,
+        -48
+      ],
+      "id": "558597c3-039f-4c5b-afca-38a6fb5ae144",
+      "name": "Set Language Params"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a professional subtitle translator specialized in technical narration and automation product demos.\n\nTARGET LANGUAGE: {{$json.targetName}} (code: {{$json.targetLang}})\n\nSTRICT OUTPUT FORMAT:\nReturn ONLY valid JSON with this EXACT structure:\n{\"segments\":[{\"start\":0,\"end\":0,\"text\":\"...\"}]}\n\nRules:\n- The root key MUST be \"segments\"\n- \"segments\" MUST be an array\n- Each element MUST include: start (number), end (number), text (string)\n- Keep the SAME number of segments as the input\n- Do NOT change start/end values\n- Do NOT add/remove/merge/split segments\n- Do NOT wrap JSON in markdown\n- No extra keys, no explanations"
+            },
+            {
+              "content": "=Translate the INPUT_SEGMENTS_JSON into {{$json.targetName}}.\nReturn ONLY JSON exactly as specified.\n\nINPUT_SEGMENTS_JSON:\n{{ JSON.stringify($json.segments) }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        896,
+        48
+      ],
+      "id": "fdf669a9-db1f-48fd-a7a7-a2c8c5d8f24a",
+      "name": "GPT - Translate & Refine (Target Lang)",
+      "credentials": {
+        "openAiApi": {
+          "id": "Z2zT01QqgRlndMbx",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        672,
+        48
+      ],
+      "id": "cfef224b-9080-4b2b-9f14-6228ef154775",
+      "name": "Merge"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "START": {
+      "main": [
+        [
+          {
+            "node": "Download video from Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Whisper - Transcribe Audio (IT)": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Download video from Drive": {
+      "main": [
+        [
+          {
+            "node": "Set Language Params",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Whisper - Transcribe Audio (IT)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Language Params": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT - Translate & Refine (Target Lang)": {
+      "main": [
+        [
+          {
+            "node": "Code: Generate SRT file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "GPT - Translate & Refine (Target Lang)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "e896ee9c-679d-48a0-b656-ccf66bf87f87",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c6340a675df2a727ab15ed3f6d8d62880dbe20df9d0152fe8457b488c5c92e1e"
+  },
+  "id": "5CLILa23LBgqqzqOGuQiy",
+  "tags": []
+}
