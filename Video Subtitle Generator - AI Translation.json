@@ -1,0 +1,200 @@
+{
+  "name": "Video Subtitle Generator - AI Translation",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "5e183796-97e7-4653-b5c0-73827e420b47",
+      "name": "START"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/audio/transcriptions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "whisper-1"
+            },
+            {
+              "name": "response_format",
+              "value": "verbose_json"
+            },
+            {
+              "name": "language",
+              "value": "it"
+            },
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        416,
+        0
+      ],
+      "id": "04c3b104-2c5f-429f-9dd7-3bb8a5757454",
+      "name": "Whisper - Transcribe Audio (IT)",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "Drw04dkmsak2YC3R",
+          "name": "Bearer Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "1iuFWhRkYHxePozIk9zCytzRRQZyMkfCo",
+          "mode": "list",
+          "cachedResultName": "W1_W3_http_sottotitoli.mp4",
+          "cachedResultUrl": "https://drive.google.com/file/d/1iuFWhRkYHxePozIk9zCytzRRQZyMkfCo/view?usp=drivesdk"
+        },
+        "options": {
+          "binaryPropertyName": "data"
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        208,
+        0
+      ],
+      "id": "2f919b43-0dcd-48d8-8fa8-03d4e72c7697",
+      "name": "Download video from Drive",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "cl6It0afYIWQfKcT",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "Sei un traduttore professionale di qualsiasi lingua e in traduzioni all'inglese. Specializzato in narrazione tecnica e demo di prodotti software di automazione.\n\nCONTESTO: Il video è una demo tecnica di un sistema di automazione per un negozio di biciclette costruito con n8n. Il sistema include: workflow n8n, webhook, HTTP requests, Gmail triggers, Google Sheets come database (potrebbe essere pronunciato male come \"Google City\", \"monad\", \"Monad database\" o simili - sono TUTTI Google Sheets), e validazione dati con AI.\n\nTi passo dei segmenti di trascrizione in italiano con timestamp in formato JSON. Il tuo lavoro:\n\n1. Traduci ogni segmento in inglese fluido e naturale\n2. Correggi eventuali frasi sconnesse, ripetizioni o errori del parlante interpretando il contesto tecnico\n3. Correggi nomi di tecnologie trascritti male (es: \"monad\"/\"Monad database\"/\"Google City\" → \"Google Sheets\")\n4. Se un segmento contiene solo una parola isolata o sembra un errore di trascrizione, riformulalo nel contesto dei segmenti vicini\n5. Completa ogni segmento in modo che abbia senso da solo come sottotitolo leggibile\n6. Adatta il tono per essere professionale ma accessibile\n7. MANTIENI ESATTAMENTE la stessa struttura JSON con gli stessi timestamp (start, end) e lo stesso numero di segmenti\n8. NON aggiungere, rimuovere o unire segmenti\n9. Rispondi SOLO con il JSON tradotto, senza commenti o spiegazioni"
+            },
+            {
+              "content": "={{ JSON.stringify($json.segments) }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        624,
+        16
+      ],
+      "id": "fdf669a9-db1f-48fd-a7a7-a2c8c5d8f24a",
+      "name": "GPT - Translate & Refine (EN)",
+      "credentials": {
+        "openAiApi": {
+          "id": "Z2zT01QqgRlndMbx",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Naviga nella struttura esatta dell'output OpenAI\nconst input = $input.first().json;\nconst response = input.output[0].content[0].text;\n\n// Pulisci eventuale markdown\nconst cleaned = response.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\nconst segments = JSON.parse(cleaned);\n\n// Converti secondi in formato SRT\nfunction toSrtTime(seconds) {\n  const h = Math.floor(seconds / 3600);\n  const m = Math.floor((seconds % 3600) / 60);\n  const s = Math.floor(seconds % 60);\n  const ms = Math.round((seconds % 1) * 1000);\n  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')},${String(ms).padStart(3, '0')}`;\n}\n\n// Costruisci il file SRT\nlet srt = '';\nsegments.forEach((seg, i) => {\n  srt += `${i + 1}\\n`;\n  srt += `${toSrtTime(seg.start)} --> ${toSrtTime(seg.end)}\\n`;\n  srt += `${seg.text}\\n\\n`;\n});\n\nreturn [{\n  json: { srtContent: srt },\n  binary: {\n    data: await this.helpers.prepareBinaryData(\n      Buffer.from(srt, 'utf-8'),\n      'subtitles.srt',\n      'text/plain'\n    )\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        976,
+        16
+      ],
+      "id": "e8739913-2dfa-49c1-9854-21150329f392",
+      "name": "Code: Generate SRT file"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "START": {
+      "main": [
+        [
+          {
+            "node": "Download video from Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Whisper - Transcribe Audio (IT)": {
+      "main": [
+        [
+          {
+            "node": "GPT - Translate & Refine (EN)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download video from Drive": {
+      "main": [
+        [
+          {
+            "node": "Whisper - Transcribe Audio (IT)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT - Translate & Refine (EN)": {
+      "main": [
+        [
+          {
+            "node": "Code: Generate SRT file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "2a800d84-1044-41bf-a10a-f8e8840d5625",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c6340a675df2a727ab15ed3f6d8d62880dbe20df9d0152fe8457b488c5c92e1e"
+  },
+  "id": "5CLILa23LBgqqzqOGuQiy",
+  "tags": []
+}
